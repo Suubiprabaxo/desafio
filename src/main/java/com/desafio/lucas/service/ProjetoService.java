@@ -1,6 +1,6 @@
 package com.desafio.lucas.service;
 
-import com.desafio.lucas.dto.MembroMockDTO;
+import com.desafio.lucas.dto.MembroDTO;
 import com.desafio.lucas.exception.RecursoNaoEncontradoException;
 import com.desafio.lucas.exception.RegraNegocioException;
 import com.desafio.lucas.model.Projeto;
@@ -58,7 +58,7 @@ public class ProjetoService {
     @Transactional
     public Projeto associarMembro(Long projetoId, Long membroId) {
         Projeto projeto = buscarPorId(projetoId);
-        MembroMockDTO membro = membroService.buscarMembro(membroId);
+        MembroDTO membro = membroService.buscarMembro(membroId);
 
         if (!"funcionário".equalsIgnoreCase(membro.atribuicao())) {
             throw new RegraNegocioException("Apenas membros com atribuição 'funcionário' podem ser associados.");
