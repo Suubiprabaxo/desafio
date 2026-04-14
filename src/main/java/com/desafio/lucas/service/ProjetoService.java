@@ -63,6 +63,9 @@ public class ProjetoService {
         if (!projeto.getStatus().podeTransitarPara(novoStatus)) {
             throw new RegraNegocioException("Transição de status inválida de " + projeto.getStatus() + " para " + novoStatus);
         }
+        if (novoStatus == StatusProjeto.ENCERRADO && projeto.getDataRealTermino() == null) {
+            throw new RegraNegocioException("Projeto só pode ser encerrado com data de término preenchida.");
+        }
         projeto.setStatus(novoStatus);
         return projetoRepository.save(projeto);
     }
@@ -108,6 +111,7 @@ public class ProjetoService {
 
         double mediaDuracao = projetos.stream()
                 .filter(p -> p.getStatus() == StatusProjeto.ENCERRADO)
+                .filter(p -> p.getDataInicio() != null && p.getDataRealTermino() != null)
                 .mapToLong(p -> ChronoUnit.DAYS.between(p.getDataInicio(), p.getDataRealTermino()))
                 .average()
                 .orElse(0);
