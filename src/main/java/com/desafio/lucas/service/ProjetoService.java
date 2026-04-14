@@ -1,8 +1,11 @@
 package com.desafio.lucas.service;
 
 import com.desafio.lucas.dto.MembroDTO;
+import com.desafio.lucas.dto.ProjetoCriacaoDTO;
+import com.desafio.lucas.dto.RelatorioPortfolioDTO;
 import com.desafio.lucas.exception.RecursoNaoEncontradoException;
 import com.desafio.lucas.exception.RegraNegocioException;
+import com.desafio.lucas.mapper.ProjetoMapper;
 import com.desafio.lucas.model.Projeto;
 import com.desafio.lucas.model.enums.StatusProjeto;
 import com.desafio.lucas.repository.ProjetoRepository;
@@ -12,7 +15,11 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -20,8 +27,12 @@ public class ProjetoService {
 
     private final ProjetoRepository projetoRepository;
     private final MockMembroService membroService;
+    private final ProjetoMapper projetoMapper;
 
-    public Page<Projeto> listar(Pageable pageable) {
+    public Page<Projeto> listar(StatusProjeto status, Pageable pageable) {
+        if (status != null) {
+            return projetoRepository.findByStatus(status, pageable);
+        }
         return projetoRepository.findAll(pageable);
     }
 
@@ -31,7 +42,8 @@ public class ProjetoService {
     }
 
     @Transactional
-    public Projeto salvar(Projeto projeto) {
+    public Projeto salvar(ProjetoCriacaoDTO dto) {
+        Projeto projeto = projetoMapper.toEntity(dto);
         projeto.setStatus(StatusProjeto.EM_ANALISE);
         return projetoRepository.save(projeto);
     }
@@ -75,5 +87,41 @@ public class ProjetoService {
 
         projeto.getMembrosIds().add(membroId);
         return projetoRepository.save(projeto);
+    }
+
+    public RelatorioPortfolioDTO gerarRelatorio() {
+
+        List<Projeto> projetos = projetoRepository.findAll();
+
+        Map<String, Long> quantidadePorStatus = projetos.stream()
+                .collect(Collectors.groupingBy(p -> p.getStatus().name(), Collectors.counting()));
+
+        Map<String, BigDecimal> orcamentoPorStatus = projetos.stream()
+                .collect(Collectors.groupingBy(
+                        p -> p.getStatus().name(),
+                        Collectors.reducing(
+                                BigDecimal.ZERO,
+                                Projeto::getOrcamentoTotal,
+                                BigDecimal::add
+                        )
+                ));
+
+        double mediaDuracao = projetos.stream()
+                .filter(p -> p.getStatus() == StatusProjeto.ENCERRADO)
+                .mapToLong(p -> ChronoUnit.DAYS.between(p.getDataInicio(), p.getDataRealTermino()))
+                .average()
+                .orElse(0);
+
+        long membrosUnicos = projetos.stream()
+                .flatMap(p -> p.getMembrosIds().stream())
+                .distinct()
+                .count();
+
+        return new RelatorioPortfolioDTO(
+                quantidadePorStatus,
+                orcamentoPorStatus,
+                mediaDuracao,
+                membrosUnicos
+        );
     }
 }

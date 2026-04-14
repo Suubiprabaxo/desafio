@@ -1,11 +1,14 @@
 package com.desafio.lucas.controller;
 
+import com.desafio.lucas.dto.ProjetoCriacaoDTO;
 import com.desafio.lucas.dto.ProjetoDTO;
-import com.desafio.lucas.model.Projeto;
+import com.desafio.lucas.dto.RelatorioPortfolioDTO;
+import com.desafio.lucas.mapper.ProjetoMapper;
 import com.desafio.lucas.model.enums.StatusProjeto;
 import com.desafio.lucas.service.ProjetoService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -20,18 +23,25 @@ import org.springframework.web.bind.annotation.*;
 public class ProjetoController {
 
     private final ProjetoService projetoService;
+    private final ProjetoMapper projetoMapper;
 
     @GetMapping
     @Operation(summary = "Listar projetos com paginação")
-    public ResponseEntity<Page<ProjetoDTO>> listar(Pageable pageable) {
-        Page<ProjetoDTO> projetos = projetoService.listar(pageable).map(this::toDTO);
+    public ResponseEntity<Page<ProjetoDTO>> listar(
+            @RequestParam(required = false) StatusProjeto status,
+            Pageable pageable) {
+
+        Page<ProjetoDTO> projetos = projetoService.listar(status, pageable)
+                .map(projetoMapper::toDTO);
+
         return ResponseEntity.ok(projetos);
     }
 
     @PostMapping
     @Operation(summary = "Criar um novo projeto")
-    public ResponseEntity<ProjetoDTO> criar(@RequestBody Projeto projeto) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(toDTO(projetoService.salvar(projeto)));
+    public ResponseEntity<ProjetoDTO> criar(@RequestBody @Valid ProjetoCriacaoDTO dto) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(projetoMapper.toDTO(projetoService.salvar(dto)));
     }
 
     @DeleteMapping("/{id}")
@@ -44,18 +54,17 @@ public class ProjetoController {
     @PatchMapping("/{id}/status")
     @Operation(summary = "Alterar status do projeto")
     public ResponseEntity<ProjetoDTO> alterarStatus(@PathVariable Long id, @RequestParam StatusProjeto novoStatus) {
-        return ResponseEntity.ok(toDTO(projetoService.alterarStatus(id, novoStatus)));
+        return ResponseEntity.ok(projetoMapper.toDTO(projetoService.alterarStatus(id, novoStatus)));
     }
 
     @PostMapping("/{projetoId}/membros/{membroId}")
     @Operation(summary = "Associar membro ao projeto")
     public ResponseEntity<ProjetoDTO> associarMembro(@PathVariable Long projetoId, @PathVariable Long membroId) {
-        return ResponseEntity.ok(toDTO(projetoService.associarMembro(projetoId, membroId)));
+        return ResponseEntity.ok(projetoMapper.toDTO(projetoService.associarMembro(projetoId, membroId)));
     }
 
-    private ProjetoDTO toDTO(Projeto p) {
-        return new ProjetoDTO(p.getId(), p.getNome(), p.getDataInicio(), p.getPrevisaoTermino(),
-                p.getDataRealTermino(), p.getOrcamentoTotal(), p.getDescricao(), p.getIdGerente(),
-                p.getStatus(), p.getRisco(), p.getMembrosIds());
+    @GetMapping("/relatorio")
+    public ResponseEntity<RelatorioPortfolioDTO> relatorio() {
+        return ResponseEntity.ok(projetoService.gerarRelatorio());
     }
 }
